@@ -230,7 +230,7 @@
                     </div>
                 </div>
 
-                <!-- Seção Gerir Meses (NOVA) -->
+                <!-- Seção Gerir Meses -->
                 <div id="section-meses" class="admin-section hidden">
                     <div class="card">
                         <h2 class="text-xl font-bold mb-4">Gerir Meses</h2>
@@ -635,8 +635,7 @@
         let menuSettings = {};
         let quill;
         
-        // --- HOISTED FUNCTIONS (Declared first to avoid reference errors) ---
-        
+        // --- Funções de UI (Hoisted) ---
         function showDashboard() {
             document.getElementById('login-section').style.display = 'none';
             document.getElementById('dashboard-section').style.display = 'block';
@@ -652,20 +651,16 @@
             document.getElementById('dashboard-section').style.display = 'none';
             const loginForm = document.getElementById('login-form');
             if (loginForm) {
-                // Attach submit listener here to ensure it's ready
                 loginForm.onsubmit = async (e) => {
                     e.preventDefault();
                     const email = document.getElementById('email').value;
                     const password = document.getElementById('password').value;
                     const rememberMe = document.getElementById('remember-me').checked;
-                    
                     const persistence = rememberMe ? browserLocalPersistence : browserSessionPersistence;
-
                     try { 
                         await setPersistence(auth, persistence);
                         await signInWithEmailAndPassword(auth, email, password); 
                     } catch (error) { 
-                        console.error("Erro no login:", error);
                         openInfoModal('Email ou palavra-passe incorreta!'); 
                     }
                 };
@@ -739,10 +734,11 @@
             return input; 
         }
         
+        // --- Funções de Lógica de Negócio ---
         async function deactivateParticipant(id) {
             const participant = participantsData[id];
             if (!participant) return;
-            if (await openConfirmModal(`Tem a certeza que deseja DESATIVAR ${participant.name.toUpperCase()}? Ele será removido das listas, mas o seu histórico será mantido.`)) {
+            if (await openConfirmModal(`Tem a certeza que deseja DESATIVAR ${participant.name.toUpperCase()}?`)) {
                 try {
                     const participantRef = doc(db, 'participants', id);
                     await updateDoc(participantRef, { isActive: false });
@@ -773,6 +769,10 @@
                 }
             }
         }
+
+        function safeStringify(obj) {
+            try { return JSON.stringify(obj, null, 2); } catch (e) { return "[Object cannot be stringified directly]"; }
+        }
         
         async function logAction(action, details, before, after) {
             if (!auth.currentUser) return;
@@ -783,8 +783,8 @@
                     action: action,
                     details: details,
                 };
-                if (before) logEntry.before = JSON.stringify(before, null, 2);
-                if (after) logEntry.after = JSON.stringify(after, null, 2);
+                if (before) logEntry.before = safeStringify(before);
+                if (after) logEntry.after = safeStringify(after);
                 await addDoc(collection(db, 'logs'), logEntry);
             } catch (error) { console.error("Erro ao gravar log:", error); }
         }
@@ -799,6 +799,7 @@
             return thursdays.map(d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
         }
 
+        // --- Funções de Renderização (Hoisted) ---
         function renderTeamSelectors(newTeamToSelect = '') {
             const selects = [document.getElementById('participant-team'), document.getElementById('edit-participant-team'), document.getElementById('filter-team')];
             const sortedTeams = Object.entries(teamsData).filter(([id, team]) => team.isActive !== false).sort((a,b) => a[1].name.localeCompare(b[1].name));
@@ -928,33 +929,16 @@
             });
         }
 
-        // Renderização dos MESES (NOVA FUNÇÃO)
         function renderMonthsList() {
             const list = document.getElementById('months-list-container');
             list.innerHTML = '';
-            
-            const sortedMonths = Object.entries(monthlyData).sort((a,b) => b[0].localeCompare(a[0])); // ID reverse sort
-            
-            if(sortedMonths.length === 0) {
-                list.innerHTML = '<p class="text-gray-500">Nenhum mês registado.</p>';
-                return;
-            }
-
+            const sortedMonths = Object.entries(monthlyData).sort((a,b) => b[0].localeCompare(a[0]));
+            if(sortedMonths.length === 0) { list.innerHTML = '<p class="text-gray-500">Nenhum mês registado.</p>'; return; }
             sortedMonths.forEach(([id, data]) => {
                 const isHidden = data.isVisible === false;
                 const div = document.createElement('div');
                 div.className = 'flex items-center justify-between p-3 bg-gray-50 rounded-lg';
-                div.innerHTML = `
-                    <div>
-                        <span class="font-bold text-lg">${data.title}</span>
-                        <span class="text-xs text-gray-500 block">ID: ${id}</span>
-                    </div>
-                    <div class="flex gap-2">
-                        <button class="btn btn-sm btn-secondary edit-month-title-btn" data-id="${id}" title="Editar Título"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm ${isHidden ? 'btn-primary' : 'btn-secondary'} toggle-month-vis-btn" data-id="${id}" title="${isHidden ? 'Mostrar' : 'Ocultar'}"><i class="fas ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
-                        <button class="btn btn-sm btn-danger delete-month-btn" data-id="${id}" title="Excluir Mês"><i class="fas fa-trash"></i></button>
-                    </div>
-                `;
+                div.innerHTML = `<div><span class="font-bold text-lg">${data.title}</span><span class="text-xs text-gray-500 block">ID: ${id}</span></div><div class="flex gap-2"><button class="btn btn-sm btn-secondary edit-month-title-btn" data-id="${id}" title="Editar Título"><i class="fas fa-edit"></i></button><button class="btn btn-sm ${isHidden ? 'btn-primary' : 'btn-secondary'} toggle-month-vis-btn" data-id="${id}" title="${isHidden ? 'Mostrar' : 'Ocultar'}"><i class="fas ${isHidden ? 'fa-eye-slash' : 'fa-eye'}"></i></button><button class="btn btn-sm btn-danger delete-month-btn" data-id="${id}" title="Excluir Mês"><i class="fas fa-trash"></i></button></div>`;
                 list.appendChild(div);
             });
         }
@@ -1100,7 +1084,7 @@
                 const dataToSave = { 
                     title: monthlyData[monthId]?.title, 
                     stages, isCompleted, geral_podium_img: geralPodiumImg,
-                    isVisible: monthlyData[monthId]?.isVisible !== false // Persist visibility
+                    isVisible: monthlyData[monthId]?.isVisible !== false 
                 };
                 await setDoc(doc(db, 'results', monthId), dataToSave, { merge: true });
                 monthlyData[monthId] = dataToSave;
@@ -1137,7 +1121,7 @@
                 const initialMonth = document.getElementById('month-select-admin').value;
                 if(initialMonth) renderResultsForm(initialMonth);
 
-            } catch (error) { console.error(e); openInfoModal("Erro ao carregar dados."); }
+            } catch (error) { console.error(error); openInfoModal("Erro ao carregar dados."); }
         }
         
         function setupDashboardEventListeners() {
@@ -1283,6 +1267,46 @@
             // Participants, Teams, News Listeners (Abbreviated - logic is same)
             document.getElementById('filter-team').onchange = renderParticipants;
             document.getElementById('filter-name').oninput = renderParticipants;
+
+             // ADDED TRY-CATCH HERE FOR ROBUSTNESS
+             document.getElementById('add-participant-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const name = document.getElementById('participant-name').value.trim();
+                    const fullName = document.getElementById('participant-fullname').value.trim();
+                    if (!name || !fullName) {
+                         openInfoModal("Preencha Nome e Nome Completo.");
+                         return;
+                    }
+                    const sanitizedName = name.replace(/\s+/g, '-').toLowerCase();
+                    const participantId = `${sanitizedName}-${Math.random().toString(36).substring(2, 8)}`;
+                    
+                    const participantData = {
+                        name: name,
+                        fullName: fullName,
+                        teamHistory: [{
+                            teamId: document.getElementById('participant-team').value,
+                            date: new Date().toISOString().split('T')[0]
+                        }],
+                        imageUrl: document.getElementById('participant-image-filename').value.trim(),
+                        strava: normalizeSocialLink(document.getElementById('participant-strava').value, 'strava'),
+                        instagram: normalizeSocialLink(document.getElementById('participant-instagram').value, 'instagram'),
+                        facebook: normalizeSocialLink(document.getElementById('participant-facebook').value, 'facebook'),
+                        isActive: true,
+                        createdAt: serverTimestamp()
+                    };
+
+                    await setDoc(doc(db, "participants", participantId), participantData);
+                    await logAction('PARTICIPANT_CREATED', `Participante "${name}" criado.`, null, participantData);
+                    
+                    e.target.reset();
+                    await loadAllData();
+                    openInfoModal('Participante adicionado!');
+                } catch (error) {
+                    console.error("Erro ao adicionar participante:", error);
+                    openInfoModal(`Erro ao adicionar: ${error.message}`);
+                }
+            });
             
              // Moderação de Comentários
             document.querySelectorAll('.moderate-comments-btn').forEach(btn => {
